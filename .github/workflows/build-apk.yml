@@ -41,36 +41,45 @@ jobs:
       - name: Generate code
         run: dart run build_runner build --delete-conflicting-outputs
 
-      - name: Build NewPipeExtractor from source and install to Maven local
+      - name: Build NewPipeExtractor and publish to Maven local
         run: |
-          # Find the exact NewPipeExtractor commit the plugin needs
-          CACHE_DIR=$(find ~/.pub-cache/git -maxdepth 1 -name "flutter_new_pipe_extractor*" -type d | head -1)
-          NPE_COMMIT=$(grep -oP "(?<=NewPipeExtractor:)[a-f0-9]+" "$CACHE_DIR/android/build.gradle" | head -1)
-          echo "NewPipeExtractor commit needed: $NPE_COMMIT"
+          NPE_COMMIT="e4e5ccc1fdef8afc684cf00cd01ecb19cc7ef4b0"
 
           git clone --depth=200 https://github.com/teamnewpipe/NewPipeExtractor /tmp/npe
           cd /tmp/npe
           git checkout $NPE_COMMIT
-
           chmod +x gradlew
-          echo "=== Building JAR (skip tests) ==="
-          ./gradlew jar -x test --no-daemon 2>&1 | tail -40
 
-          JAR=$(find . -path "*/build/libs/*.jar" ! -name "*sources*" ! -name "*javadoc*" | head -1)
-          echo "Built JAR: $JAR"
-          ls -lh "$JAR"
+          echo "=== Publishing NewPipeExtractor to Maven local ==="
+          ./gradlew publishToMavenLocal -x test --no-daemon 2>&1 | tail -40
 
-          echo "=== Installing to Maven local with JitPack coordinates ==="
-          mvn install:install-file \
-            -Dfile="$JAR" \
-            -DgroupId=com.github.teamnewpipe \
-            -DartifactId=NewPipeExtractor \
-            -Dversion=$NPE_COMMIT \
-            -Dpackaging=jar \
-            --quiet
+          echo "=== Maven local org.schabi contents ==="
+          find ~/.m2/repository/org/schabi -type f | head -20
 
-          echo "Maven local contents:"
-          find ~/.m2/repository/com/github/teamnewpipe -type f
+          # Find the JAR and version published by the project itself
+          NPE_JAR=$(find ~/.m2/repository/org/schabi -name "*.jar" \
+            ! -name "*sources*" ! -name "*javadoc*" | head -1)
+          NPE_VERSION=$(find ~/.m2/repository/org/schabi -name "*.pom" | head -1 | \
+            grep -oPm1 "(?<=<version>)[^<]+")
+          echo "Published JAR : $NPE_JAR"
+          echo "Published ver : $NPE_VERSION"
+
+          # Verify JAR actually contains the extractor classes
+          echo "=== Classes check ==="
+          jar tf "$NPE_JAR" | grep "schabi/newpipe/extractor" | head -5
+
+          # Patch the flutter_new_pipe_extractor plugin's build.gradle to use
+          # the local Maven coordinates instead of the broken JitPack commit hash
+          CACHE_DIR=$(find ~/.pub-cache/git -maxdepth 1 \
+            -name "flutter_new_pipe_extractor*" -type d | head -1)
+          echo "Plugin cache dir: $CACHE_DIR"
+
+          sed -i \
+            "s|com.github.teamnewpipe:NewPipeExtractor:[a-f0-9]*|org.schabi.newpipe:NewPipeExtractor:$NPE_VERSION|g" \
+            "$CACHE_DIR/android/build.gradle"
+
+          echo "=== Patched plugin build.gradle ==="
+          cat "$CACHE_DIR/android/build.gradle"
 
       - name: Build APK
         run: flutter build apk --flavor stable --release

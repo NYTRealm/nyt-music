@@ -41,6 +41,12 @@ jobs:
       - name: Generate code
         run: dart run build_runner build --delete-conflicting-outputs
 
+      - name: Pre-trigger JitPack build
+        run: |
+          echo "Triggering JitPack to build NewPipeExtractor..."
+          curl -s "https://jitpack.io/com/github/teamnewpipe/NewPipeExtractor/e4e5ccc1fdef8afc684cf00cd01ecb19cc7ef4b0/build.log" || true
+          sleep 90
+
       - name: Build APK
         run: flutter build apk --flavor stable --release
 

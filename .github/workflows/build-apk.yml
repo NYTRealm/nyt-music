@@ -41,46 +41,6 @@ jobs:
       - name: Generate code
         run: dart run build_runner build --delete-conflicting-outputs
 
-      - name: Find stable flutter_new_pipe_extractor commit
-        run: |
-          git clone https://github.com/KRTirtho/flutter_new_pipe_extractor /tmp/fnpe
-          cd /tmp/fnpe
-          echo "=== Git log ==="
-          git log --oneline | head -20
-          echo "=== android/build.gradle ==="
-          cat android/build.gradle 2>/dev/null || echo "(not found)"
-          echo "=== android/build.gradle.kts ==="
-          cat android/build.gradle.kts 2>/dev/null || echo "(not found)"
-
-      - name: Trigger and wait for JitPack to build NewPipeExtractor
-        run: |
-          COMMIT="e4e5ccc1fdef8afc684cf00cd01ecb19cc7ef4b0"
-          POM_URL="https://jitpack.io/com/github/teamnewpipe/NewPipeExtractor/$COMMIT/NewPipeExtractor-$COMMIT.pom"
-          LOG_URL="https://jitpack.io/com/github/teamnewpipe/NewPipeExtractor/$COMMIT/build.log"
-
-          echo "Triggering JitPack build..."
-          curl -s "$POM_URL" > /dev/null || true
-
-          echo "Polling JitPack for up to 10 minutes..."
-          for i in $(seq 1 20); do
-            echo "=== Attempt $i/20 ==="
-            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$POM_URL")
-            echo "HTTP Status for POM: $STATUS"
-            if [ "$STATUS" = "200" ]; then
-              echo "JitPack artifact is ready!"
-              break
-            fi
-            echo "Build log so far:"
-            curl -s "$LOG_URL" | tail -10 || echo "(no log yet)"
-            echo "Waiting 30s..."
-            sleep 30
-          done
-
-      - name: Clear Gradle dependency cache for NewPipeExtractor
-        run: |
-          rm -rf ~/.gradle/caches/modules-2/files-2.1/com.github.teamnewpipe/ || true
-          rm -rf ~/.gradle/caches/modules-2/metadata-2.1/ || true
-
       - name: Build APK
         run: flutter build apk --flavor stable --release
 

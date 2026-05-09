@@ -91,6 +91,18 @@ jobs:
           echo "=== Patched plugin build.gradle ==="
           cat "$CACHE_DIR/android/build.gradle"
 
+      - name: Generate keystore for signing
+        run: |
+          keytool -genkey -v \
+            -keystore /tmp/nyt-music-key.jks \
+            -alias nytmusic \
+            -keyalg RSA -keysize 2048 -validity 10000 \
+            -storepass nytmusicpass -keypass nytmusicpass \
+            -dname "CN=NYT Music, OU=Music, O=NYT, L=Unknown, ST=Unknown, C=US"
+
+          printf 'storePassword=nytmusicpass\nkeyPassword=nytmusicpass\nkeyAlias=nytmusic\nstoreFile=/tmp/nyt-music-key.jks\n' \
+            > android/key.properties
+
       - name: Build APK
         run: flutter build apk --flavor stable --release
 

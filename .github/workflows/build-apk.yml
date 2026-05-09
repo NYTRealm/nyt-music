@@ -41,6 +41,33 @@ jobs:
       - name: Generate code
         run: dart run build_runner build --delete-conflicting-outputs
 
+      - name: Patch flutter_new_pipe_extractor to use older working NewPipeExtractor
+        run: |
+          # Clone the plugin repo to find the pre-upgrade NewPipeExtractor version
+          git clone --depth=50 https://github.com/KRTirtho/flutter_new_pipe_extractor /tmp/fnpe
+          cd /tmp/fnpe
+
+          # e3f1e0c is the commit that upgraded to the broken e4e5ccc1.
+          # Get its parent (the last commit that used a working version).
+          PARENT=$(git rev-parse e3f1e0c^)
+          echo "Pre-upgrade commit: $PARENT"
+
+          echo "=== build.gradle at pre-upgrade commit ==="
+          git show $PARENT:android/build.gradle
+
+          # Extract the old NewPipeExtractor version string
+          OLD_VER=$(git show $PARENT:android/build.gradle | grep -oP "(?<=NewPipeExtractor:)[^'\"]+" | head -1)
+          echo "Old NewPipeExtractor version: $OLD_VER"
+
+          # Find the plugin in the Flutter pub cache and patch its build.gradle
+          CACHE_DIR=$(find ~/.pub-cache/git -maxdepth 1 -name "flutter_new_pipe_extractor*" -type d | head -1)
+          echo "Plugin cache dir: $CACHE_DIR"
+
+          sed -i "s|NewPipeExtractor:e4e5ccc1fdef8afc684cf00cd01ecb19cc7ef4b0|NewPipeExtractor:$OLD_VER|g" "$CACHE_DIR/android/build.gradle"
+
+          echo "=== Patched build.gradle ==="
+          cat "$CACHE_DIR/android/build.gradle"
+
       - name: Build APK
         run: flutter build apk --flavor stable --release
 

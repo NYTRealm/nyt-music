@@ -65,6 +65,11 @@ jobs:
             sleep 30
           done
 
+      - name: Clear Gradle dependency cache for NewPipeExtractor
+        run: |
+          rm -rf ~/.gradle/caches/modules-2/files-2.1/com.github.teamnewpipe/ || true
+          rm -rf ~/.gradle/caches/modules-2/metadata-2.1/ || true
+
       - name: Build APK
         run: flutter build apk --flavor stable --release
 

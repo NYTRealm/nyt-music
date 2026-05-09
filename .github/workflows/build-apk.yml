@@ -41,19 +41,29 @@ jobs:
       - name: Generate code
         run: dart run build_runner build --delete-conflicting-outputs
 
-      - name: Build NewPipeExtractor from source
+      - name: Trigger and wait for JitPack to build NewPipeExtractor
         run: |
-          NPE_COMMIT="e4e5ccc1fdef8afc684cf00cd01ecb19cc7ef4b0"
-          git clone https://github.com/TeamNewPipe/NewPipeExtractor.git /tmp/npe
-          cd /tmp/npe
-          git checkout $NPE_COMMIT
-          chmod +x gradlew
-          # Append group/version override for local Maven publish
-          echo "" >> build.gradle
-          echo "allprojects { group = 'com.github.teamnewpipe'; version = '$NPE_COMMIT' }" >> build.gradle
-          ./gradlew publishToMavenLocal --no-daemon -x test
-          echo "Published artifacts:"
-          find ~/.m2/repository/com/github/teamnewpipe -type f | head -20
+          COMMIT="e4e5ccc1fdef8afc684cf00cd01ecb19cc7ef4b0"
+          POM_URL="https://jitpack.io/com/github/teamnewpipe/NewPipeExtractor/$COMMIT/NewPipeExtractor-$COMMIT.pom"
+          LOG_URL="https://jitpack.io/com/github/teamnewpipe/NewPipeExtractor/$COMMIT/build.log"
+
+          echo "Triggering JitPack build..."
+          curl -s "$POM_URL" > /dev/null || true
+
+          echo "Polling JitPack for up to 10 minutes..."
+          for i in $(seq 1 20); do
+            echo "=== Attempt $i/20 ==="
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$POM_URL")
+            echo "HTTP Status for POM: $STATUS"
+            if [ "$STATUS" = "200" ]; then
+              echo "JitPack artifact is ready!"
+              break
+            fi
+            echo "Build log so far:"
+            curl -s "$LOG_URL" | tail -10 || echo "(no log yet)"
+            echo "Waiting 30s..."
+            sleep 30
+          done
 
       - name: Build APK
         run: flutter build apk --flavor stable --release
